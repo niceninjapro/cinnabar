@@ -49,6 +49,7 @@ pub(super) struct PhysicalControls {
     ime_owned: bool,
     left_held: bool,
     held_keys: Vec<String>,
+    held_key_codes: Vec<KeyCode>,
     /// Whether `held_keys` was seeded from physical input since the mod attached or refocused.
     held_seeded: bool,
     restore_capture: bool,
@@ -190,7 +191,7 @@ pub(super) fn prepare_mod_input(
         }
         let name = format!("{:?}", event.key_code);
         let down = event.state == ButtonState::Pressed;
-        physical.track_held(name.clone(), down);
+        physical.track_key(event.key_code, down);
         if down
             && !event.repeat
             && extension.as_ref().is_some_and(|extension| {
@@ -226,6 +227,7 @@ pub(super) fn prepare_mod_input(
     if !focused {
         physical.left_held = false;
         physical.held_keys.clear();
+        physical.held_key_codes.clear();
         physical.held_seeded = false;
     }
     let primary_pressed = pointer_pressed.iter().any(|key| key == "MouseLeft");
@@ -284,6 +286,7 @@ pub(super) fn prepare_mod_input(
                 mouse.as_deref_mut(),
                 &subscriptions,
                 toggle.as_deref(),
+                &physical.held_key_codes,
                 reserved.as_deref_mut(),
             );
         }
@@ -729,6 +732,7 @@ pub(super) fn prepare_mod_input(
             mouse.as_deref_mut(),
             &subscriptions,
             toggle,
+            &physical.held_key_codes,
             reserved.as_deref_mut(),
         );
     }
@@ -794,6 +798,7 @@ fn consume_reserved(
     mouse: Option<&mut ButtonInput<MouseButton>>,
     reserved: &[String],
     toggle: Option<&str>,
+    physical_held: &[KeyCode],
     mut consumed: Option<&mut super::ReservedControls>,
 ) {
     let is_reserved = |name: &str| reserved.iter().any(|key| key == name) || toggle == Some(name);
@@ -809,6 +814,12 @@ fn consume_reserved(
         .collect();
     for key in consumed_keys {
         keys.reset(key);
+    }
+    for &key in physical_held {
+        let name = format!("{key:?}");
+        if !is_reserved(&name) && !keys.pressed(key) {
+            keys.press(key);
+        }
     }
     if let Some(mouse) = mouse {
         for (button, name) in POINTER_BUTTONS {

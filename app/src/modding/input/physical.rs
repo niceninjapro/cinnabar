@@ -21,6 +21,7 @@ impl PhysicalControls {
         }
         self.left_held = false;
         self.held_keys.clear();
+        self.held_key_codes.clear();
         self.held_seeded = false;
         self.packet_pointer_active = false;
     }
@@ -31,7 +32,26 @@ impl PhysicalControls {
             return;
         }
         for key in pressed.filter(|key| !matches!(key, KeyCode::Unidentified(_))) {
-            self.track_held(format!("{key:?}"), true);
+            self.track_key(*key, true);
+        }
+    }
+
+    /// Tracks a keyboard key by both its host-facing name and native input identity.
+    pub(super) fn track_key(&mut self, key: KeyCode, pressed: bool) {
+        let name = format!("{key:?}");
+        self.track_held(name.clone(), pressed);
+        let index = self.held_key_codes.iter().position(|held| *held == key);
+        match (pressed, index) {
+            (true, None)
+                if self.held_keys.iter().any(|held| *held == name)
+                    && self.held_key_codes.len() < mod_api::MAX_CONTROL_KEYS =>
+            {
+                self.held_key_codes.push(key);
+            }
+            (false, Some(index)) => {
+                self.held_key_codes.swap_remove(index);
+            }
+            _ => {}
         }
     }
 
