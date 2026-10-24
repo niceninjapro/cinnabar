@@ -133,11 +133,39 @@ fn reserved_fast_tap_never_reaches_gameplay_edges() {
     keys.press(KeyCode::KeyW);
     keys.release(KeyCode::KeyW);
     keys.press(KeyCode::KeyA);
-    consume_reserved(&mut keys, None, &["KeyW".into()], Some("ShiftRight"), None);
+    consume_reserved(
+        &mut keys,
+        None,
+        &["KeyW".into()],
+        Some("ShiftRight"),
+        &[KeyCode::KeyW],
+        None,
+    );
     assert!(!keys.just_pressed(KeyCode::KeyW));
     assert!(!keys.just_released(KeyCode::KeyW));
     assert!(keys.pressed(KeyCode::KeyA));
     assert!(keys.just_pressed(KeyCode::KeyA));
+}
+
+#[test]
+fn physically_held_key_is_restored_after_its_reservation_ends() {
+    let mut keys = ButtonInput::default();
+    keys.press(KeyCode::KeyW);
+    let physical_held = [KeyCode::KeyW];
+
+    consume_reserved(
+        &mut keys,
+        None,
+        &["KeyW".into()],
+        None,
+        &physical_held,
+        None,
+    );
+    assert!(!keys.pressed(KeyCode::KeyW));
+
+    consume_reserved(&mut keys, None, &[], None, &physical_held, None);
+    assert!(keys.pressed(KeyCode::KeyW));
+    assert!(keys.just_pressed(KeyCode::KeyW));
 }
 
 #[test]
@@ -190,11 +218,11 @@ fn keys_already_held_when_a_mod_attaches_are_reported_held_without_a_press_edge(
 #[test]
 fn held_keys_follow_press_and_release_and_stay_bounded() {
     let mut physical = PhysicalControls::default();
-    physical.track_held("Digit1".into(), true);
-    physical.track_held("Digit1".into(), true);
-    physical.track_held("ShiftLeft".into(), true);
+    physical.track_key(KeyCode::Digit1, true);
+    physical.track_key(KeyCode::Digit1, true);
+    physical.track_key(KeyCode::ShiftLeft, true);
     assert_eq!(physical.held_keys, ["Digit1", "ShiftLeft"]);
-    physical.track_held("Digit1".into(), false);
+    physical.track_key(KeyCode::Digit1, false);
     assert_eq!(physical.held_keys, ["ShiftLeft"]);
     for index in 0..mod_api::MAX_CONTROL_KEYS * 2 {
         physical.track_held(format!("Key{index}"), true);
